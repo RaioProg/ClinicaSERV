@@ -41,6 +41,16 @@ function ejecutarAltaCita($paciente, $especialidad, $fecha, $licenciaDoctor) {
     $stmt->execute([$paciente, $especialidad, $fecha, $licenciaDoctor]);
     $stmt->closeCursor();
 
-    $res = $pdo->query("SELECT @res AS resultado")->fetch();
-    return (int)$res['resultado'];
+    $res = $pdo->query("SELECT @res AS resultado, LAST_INSERT_ID() AS id_cita")->fetch();
+    return [
+        "resultado" => (int)$res["resultado"],
+        "id_cita" => (int)$res["id_cita"]
+    ];
+}
+
+function PA_BorrarCita($idCita) {
+    global $pdo;
+    $stmt = $pdo->prepare("DELETE FROM citasMedicas WHERE id_cita = ?");
+    $stmt->execute([$idCita]);
+    return $stmt->rowCount() === 1;
 }

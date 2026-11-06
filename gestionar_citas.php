@@ -10,8 +10,35 @@ $mensaje = null;
 $registroCorrecto = false;
 
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    if (isset($_POST["accion"])) {
+    if (isset($_POST["accion"]) && $_POST["accion"] === "borrar_todas") {
         $_SESSION["lista_citas"] = [];
+    } elseif (
+        isset($_POST["accion"], $_POST["id_cita"]) &&
+        $_POST["accion"] === "anular_cita" &&
+        is_string($_POST["id_cita"])
+    ) {
+        $idCita = filter_var($_POST["id_cita"], FILTER_VALIDATE_INT);
+        $indiceCita = false;
+
+        if ($idCita !== false && $idCita > 0) {
+            foreach ($_SESSION["lista_citas"] as $indice => $cita) {
+                if (isset($cita["id_cita"]) && (int)$cita["id_cita"] === $idCita) {
+                    $indiceCita = $indice;
+                    break;
+                }
+            }
+        }
+
+        if ($indiceCita === false) {
+            $mensaje = "No se encontró esa cita en esta sesión.";
+        } elseif (PA_BorrarCita($idCita)) {
+            unset($_SESSION["lista_citas"][$indiceCita]);
+            $_SESSION["lista_citas"] = array_values($_SESSION["lista_citas"]);
+            $mensaje = "Cita anulada correctamente.";
+            $registroCorrecto = true;
+        } else {
+            $mensaje = "No se pudo anular la cita en la base de datos.";
+        }
     } elseif (
         isset($_POST["paciente"], $_POST["especialidad"], $_POST["fecha_hora"], $_POST["licencia_doctor"]) &&
         is_string($_POST["paciente"]) &&
@@ -38,12 +65,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             $mensaje = "No existe un doctor con ese número de licencia.";
         } else {
             $fechaHora = $fecha->format("Y-m-d H:i:s");
-            $resultado = ejecutarAltaCita($paciente, $especialidad, $fechaHora, $licenciaDoctor);
+            $alta = ejecutarAltaCita($paciente, $especialidad, $fechaHora, $licenciaDoctor);
+            $resultado = $alta["resultado"];
 
             if ($resultado === 0) {
                 $mensaje = "Cita registrada correctamente.";
                 $registroCorrecto = true;
                 $_SESSION["lista_citas"][] = [
+                    "id_cita" => $alta["id_cita"],
                     "paciente" => $paciente,
                     "especialidad" => $especialidad,
                     "fecha_hora" => $fechaEntrada,
@@ -96,6 +125,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <th>Especialidad</th>
                     <th>Fecha y Hora</th>
                     <th>Licencia del Doctor</th>
+                    <th>Acción</th>
                 </tr>
             </thead>
             <tbody>
@@ -105,6 +135,17 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         <td><?php echo htmlspecialchars($cita['especialidad'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars($cita['fecha_hora'], ENT_QUOTES, 'UTF-8'); ?></td>
                         <td><?php echo htmlspecialchars((string)$cita['licencia_doctor'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td>
+                            <?php if (isset($cita['id_cita'])): ?>
+                                <form action="gestionar_citas.php" method="post">
+                                    <input type="hidden" name="accion" value="anular_cita">
+                                    <input type="hidden" name="id_cita" value="<?php echo (int)$cita['id_cita']; ?>">
+                                    <button type="submit">Anular cita</button>
+                                </form>
+                            <?php else: ?>
+                                No disponible
+                            <?php endif; ?>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
