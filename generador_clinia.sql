@@ -90,7 +90,10 @@ BEGIN
     --  CASO -4 - Fecha es anterior al presente
 	ELSEIF (_fecha <= NOW()) THEN
 		SET _res = -4;
-	ELSE
+    -- CASO -5 - El doctor no existe
+    ELSEIF NOT EXISTS (SELECT 1 FROM doctores WHERE n_licencia = _doctor_asignado) THEN
+        SET _res = -5;
+    ELSE
 	-- CASO 0 - Todo OK. Instruccion nuclear 
 		INSERT INTO citasmedicas(nombre_paciente,especialidad,fecha, fk_doctor)
 						VALUES(_nombre_paciente,_especialidad,_fecha,_doctor_asignado);
@@ -98,8 +101,6 @@ BEGIN
 	END IF;
 END//
 DELIMITER ;
-
-
 
 
 

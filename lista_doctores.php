@@ -15,14 +15,14 @@ if (!isset($_SESSION["lista_doctores"])) {
  
     // 1. Capturamos los datos que viajan en el POST
     if ($_SERVER["REQUEST_METHOD"] == "POST" &&
-        !empty($_POST['licencia_doctor']) && !empty($_POST['nombre_doctor']) && !empty($_POST['apellido_doctor'])) {
-            $licencia_doctor = $_POST['licencia_doctor'];
-            $nombre_doctor = $_POST['nombre_doctor'];
-            $apellido_doctor = $_POST['apellido_doctor'];
+        !empty($_POST['licencia']) && !empty($_POST['nombreDoc']) && !empty($_POST['apellidosDoc'])) {
+            $licencia_doctor = $_POST['licencia'];
+            $nombre_doctor = $_POST['nombreDoc'];
+            $apellido_doctor = $_POST['apellidosDoc'];
            
             // 2. Acumulamos la nueva cita dentro del array guardado en la SESIÓN
  
-        $resultado = PA_AltaDoctor($_POST['licencia_doctor'],$_POST['nombre_doctor'],$_POST['apellido_doctor']);
+        $resultado = PA_AltaDoctor($licencia_doctor, $nombre_doctor, $apellido_doctor);
         if ($resultado === -1) {
             $mensaje = "Nombre vacio";
         }elseif ($resultado === -2) {
@@ -30,6 +30,7 @@ if (!isset($_SESSION["lista_doctores"])) {
         }elseif ($resultado === -3) {
             $mensaje = "Doctor repetido";
         }elseif ($resultado === 0) {
+            $mensaje = "Registrado correctamente";
             $_SESSION["lista_doctores"][] = [
             "licencia_doctor" => $licencia_doctor,
             "nombre_doctor"   => $nombre_doctor,

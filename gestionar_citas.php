@@ -1,27 +1,72 @@
 <?php
-// PASO A: Iniciar o reanudar la sesión (OBLIGATORIO al principio)
+require_once "AccesoDatos.php";
 session_start();
-// PASO B: Inicializar el array de citas 'lista_citas'en la sesión si no existe aún
+
 if (!isset($_SESSION["lista_citas"])) {
     $_SESSION["lista_citas"] = [];
 }
-// PASO C: Comprobar si se ha solicitado borrar todas las citas
-    if (isset($_POST['accion'])){
+
+$mensaje = null;
+$registroCorrecto = false;
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    if (isset($_POST["accion"])) {
         $_SESSION["lista_citas"] = [];
-    }
-// PASO D: Si se recibe una nueva cita individual por $_POST, se procesa
- 
-    // 1. Capturamos los datos que viajan en el POST
-    if ($_SERVER["REQUEST_METHOD"] == "POST" &&
-        !empty($_POST['paciente']) && !empty($_POST['especialidad']) && !empty($_POST['fecha_hora'])) {
-            $paciente = $_POST['paciente'];
-            $especialidad = $_POST['especialidad'];
-            $fecha_hora = $_POST['fecha_hora'];
-           
-            // 2. Acumulamos la nueva cita dentro del array guardado en la SESIÓN
-            array_push($_SESSION["lista_citas"], ["paciente" => $paciente, "especialidad" => $especialidad, "fecha_hora" => $fecha_hora]);
+    } elseif (
+        isset($_POST["paciente"], $_POST["especialidad"], $_POST["fecha_hora"], $_POST["licencia_doctor"]) &&
+        is_string($_POST["paciente"]) &&
+        is_string($_POST["especialidad"]) &&
+        is_string($_POST["fecha_hora"]) &&
+        is_string($_POST["licencia_doctor"])
+    ) {
+        $paciente = trim($_POST["paciente"]);
+        $especialidad = $_POST["especialidad"];
+        $fechaEntrada = $_POST["fecha_hora"];
+        $licenciaDoctor = filter_var($_POST["licencia_doctor"], FILTER_VALIDATE_INT);
+        $fecha = DateTime::createFromFormat("!Y-m-d\TH:i", $fechaEntrada);
+        $erroresFecha = DateTime::getLastErrors();
+
+        if ($paciente === "" || $especialidad === "" || $licenciaDoctor === false) {
+            $mensaje = "Completa todos los campos con datos válidos.";
+        } elseif (
+            $fecha === false ||
+            ($erroresFecha !== false && ($erroresFecha["warning_count"] > 0 || $erroresFecha["error_count"] > 0)) ||
+            $fecha->format("Y-m-d\TH:i") !== $fechaEntrada
+        ) {
+            $mensaje = "La fecha y hora no son válidas.";
+        } elseif (!PA_ExisteDoctor($licenciaDoctor)) {
+            $mensaje = "No existe un doctor con ese número de licencia.";
+        } else {
+            $fechaHora = $fecha->format("Y-m-d H:i:s");
+            $resultado = ejecutarAltaCita($paciente, $especialidad, $fechaHora, $licenciaDoctor);
+
+            if ($resultado === 0) {
+                $mensaje = "Cita registrada correctamente.";
+                $registroCorrecto = true;
+                $_SESSION["lista_citas"][] = [
+                    "paciente" => $paciente,
+                    "especialidad" => $especialidad,
+                    "fecha_hora" => $fechaEntrada,
+                    "licencia_doctor" => $licenciaDoctor
+                ];
+            } elseif ($resultado === -1) {
+                $mensaje = "El nombre del paciente es obligatorio.";
+            } elseif ($resultado === -2) {
+                $mensaje = "La especialidad es obligatoria.";
+            } elseif ($resultado === -3) {
+                $mensaje = "La fecha y hora son obligatorias.";
+            } elseif ($resultado === -4) {
+                $mensaje = "La cita debe tener una fecha y hora futuras.";
+            } elseif ($resultado === -5) {
+                $mensaje = "No existe un doctor con ese número de licencia.";
+            } else {
+                $mensaje = "No se pudo registrar la cita (código $resultado).";
+            }
         }
- 
+    } else {
+        $mensaje = "Faltan datos para registrar la cita.";
+    }
+}
 ?>
  
 <!DOCTYPE html>
@@ -34,8 +79,10 @@ if (!isset($_SESSION["lista_citas"])) {
  
     <h2>Gestión de Citas Médicas</h2>
  
-    <?php if (isset($mensaje)): ?>
-        <p style="color: green; font-weight: bold;"><?php echo $mensaje; ?></p>
+    <?php if ($mensaje !== null): ?>
+        <p style="color: <?php echo $registroCorrecto ? 'green' : 'red'; ?>; font-weight: bold;">
+            <?php echo htmlspecialchars($mensaje, ENT_QUOTES, 'UTF-8'); ?>
+        </p>
     <?php endif; ?>
  
     <h3>Citas Registradas en esta Sesión (Total: <?php echo count($_SESSION['lista_citas']); ?>)</h3>
@@ -48,14 +95,16 @@ if (!isset($_SESSION["lista_citas"])) {
                     <th>Paciente</th>
                     <th>Especialidad</th>
                     <th>Fecha y Hora</th>
+                    <th>Licencia del Doctor</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($_SESSION['lista_citas'] as $indice => $cita): ?>
                     <tr>
-                        <td><?php echo $cita['paciente'] ?></td>
-                        <td><?php echo $cita['especialidad'] ?></td>
-                        <td><?php echo $cita['fecha_hora'] ?></td>
+                        <td><?php echo htmlspecialchars($cita['paciente'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($cita['especialidad'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars($cita['fecha_hora'], ENT_QUOTES, 'UTF-8'); ?></td>
+                        <td><?php echo htmlspecialchars((string)$cita['licencia_doctor'], ENT_QUOTES, 'UTF-8'); ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -66,7 +115,7 @@ if (!isset($_SESSION["lista_citas"])) {
         <form action="gestionar_citas.php" method="post">
             <input type="hidden" name="accion" value="borrar_todas">
             <button type="submit">
-                Cancelar todas las citas
+                Vaciar citas de esta sesión
             </button>
         </form>
  

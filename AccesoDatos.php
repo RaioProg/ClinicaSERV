@@ -1,7 +1,7 @@
 <?php
 $host = 'localhost';
 $db   = 'clinica';
-$user = 'victordb';
+$user = 'VictorBD';
 $pass = 'miguelinnieto23';
  
 try {
@@ -22,16 +22,25 @@ function PA_AltaDoctor($licencia, $nombre, $apellidos) {
     global $pdo;
     $stmt = $pdo->prepare("CALL AltaDoctor(?, ?, ?, @res)");
     $stmt->execute([$licencia, $nombre, $apellidos]);
+    $stmt->closeCursor();
  
     $res = $pdo->query("SELECT @res AS resultado")->fetch();
     return (int)$res['resultado'];
 }
- 
-function ejecutarAltaCita($paciente, $especialidad, $fecha) {
+
+function PA_ExisteDoctor($licencia) {
     global $pdo;
-    $stmt = $pdo->prepare("CALL AltaCita(?, ?, ?, @res)");
-    $stmt->execute([$paciente, $especialidad, $fecha]);
+    $stmt = $pdo->prepare("SELECT 1 FROM doctores WHERE n_licencia = ? LIMIT 1");
+    $stmt->execute([$licencia]);
+    return $stmt->fetchColumn() !== false;
+}
  
+function ejecutarAltaCita($paciente, $especialidad, $fecha, $licenciaDoctor) {
+    global $pdo;
+    $stmt = $pdo->prepare("CALL AltaCita(?, ?, ?, ?, @res)");
+    $stmt->execute([$paciente, $especialidad, $fecha, $licenciaDoctor]);
+    $stmt->closeCursor();
+
     $res = $pdo->query("SELECT @res AS resultado")->fetch();
     return (int)$res['resultado'];
 }
